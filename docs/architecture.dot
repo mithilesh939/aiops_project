@@ -1,0 +1,46 @@
+digraph QuizPulse {
+  rankdir=LR; fontname="Helvetica"; nodesep=0.35; ranksep=0.6; compound=true;
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, fillcolor="#ffffff", color="#8a8fb5"];
+  edge [fontname="Helvetica", fontsize=9, color="#6a6f8f"];
+
+  subgraph cluster_data { label="1. Data & feature pipeline  (DVC DAG, Ray)"; style="rounded,filled"; fillcolor="#eef0fb"; color="#c7c9e6";
+    gen [label="synthetic_generator\n(ASSISTments optional)"];
+    ing [label="ingest + validate\n(data quality report)"];
+    bat [label="make_batches\nbatch_0 train, 1..4 live"];
+    fea [label="build_features\nRay Data / pandas"];
+    gen -> ing -> bat -> fea;
+  }
+  subgraph cluster_train { label="2. Training & registry  (MLflow)"; style="rounded,filled"; fillcolor="#eaf6ef"; color="#bfe0cd";
+    trn [label="train.py\nbaseline | LR | LightGBM"];
+    trk [label="MLflow Tracking\nparams, metrics, plots,\ngit commit, data version"];
+    reg [label="MLflow Model Registry\nalias: production"];
+    trn -> trk -> reg;
+  }
+  subgraph cluster_serve { label="3. Serving  (Docker Compose)"; style="rounded,filled"; fillcolor="#fff6e5"; color="#f0d9a8";
+    ui  [label="Frontend (nginx)\nstudent view + pipeline console", fillcolor="#fde9c9"];
+    api [label="FastAPI backend\n/predict /outcomes /weak-topics\n/next-questions /pipeline/*", fillcolor="#fde9c9"];
+    pg  [label="PostgreSQL\nattempts, predictions,\noutcomes, pipeline_runs", shape=cylinder, fillcolor="#fde9c9"];
+    ui -> api [label="REST (configurable URL)"];
+    api -> pg [dir=both];
+  }
+  subgraph cluster_ops { label="4. Monitoring & retraining"; style="rounded,filled"; fillcolor="#fbeaea"; color="#efc2c2";
+    mon [label="monitor service\nrolling AUC, PSI, drift flag", fillcolor="#f8d6d6"];
+    evi [label="Evidently\nHTML drift report", fillcolor="#f8d6d6"];
+    rtr [label="retrain.py\nchallenger vs production\nhold-out gate", fillcolor="#f8d6d6"];
+    prom[label="Prometheus\n+ alert rules", fillcolor="#f8d6d6"];
+    gra [label="Grafana dashboard", fillcolor="#f8d6d6"];
+    mon -> evi; mon -> rtr [label="drift detected"];
+    prom -> gra;
+  }
+  rep [label="replay_batches.py\n(simulated live traffic)", shape=note, fillcolor="#ffffff"];
+
+  fea -> trn [label="features.parquet"];
+  reg -> api [label="load models:/quizpulse-kt@production\nhot-reload on promotion"];
+  rep -> api [label="/predict then /outcomes"];
+  pg -> mon [label="predictions + outcomes"];
+  api -> prom [label="/metrics"];
+  mon -> prom [label="/metrics"];
+  rtr -> trk [label="log challenger run"];
+  rtr -> reg [label="register + promote\nif better"];
+  api -> mon [label="admin: drift-check / retrain", style=dashed];
+}

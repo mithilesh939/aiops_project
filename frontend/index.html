@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuizPulse - know what to practise next</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">QP</span><div><b>QuizPulse</b><small>Know what to practise next</small></div></div>
+    <nav id="tabs" role="tablist">
+      <button class="tab active" data-tab="learn" role="tab">My learning</button>
+      <button class="tab" data-tab="console" role="tab">Pipeline &amp; models</button>
+      <button class="tab" data-tab="help" role="tab">Help</button>
+    </nav>
+    <div id="conn" class="conn" title="Connection to the QuizPulse API"><i></i><span>connecting...</span></div>
+  </header>
+
+  <main>
+    <!-- ================= STUDENT VIEW ================= -->
+    <section id="learn" class="panel active">
+      <div class="card hero">
+        <div>
+          <h1>How well do I know each topic?</h1>
+          <p class="muted">Pick a student. QuizPulse looks at past quiz answers and estimates how likely they are to get the next question right in every topic.</p>
+        </div>
+        <form id="student-form" class="row" autocomplete="off">
+          <label for="student-id" class="sr">Student ID</label>
+          <input id="student-id" list="student-list" placeholder="Student ID, e.g. S0001" required>
+          <datalist id="student-list"></datalist>
+          <button class="btn primary" type="submit">Show my topics</button>
+        </form>
+      </div>
+
+      <div id="learn-empty" class="empty card">Choose a student above to see their topics.</div>
+
+      <div id="learn-body" class="grid two hidden">
+        <div class="card">
+          <div class="card-head"><h2>Topic mastery</h2><span id="mastery-version" class="pill"></span></div>
+          <p class="muted small">Longer bar = stronger. Topics below 50% are marked <b class="weakword">weak</b>.</p>
+          <ul id="mastery-list" class="mastery"></ul>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><h2>Practise next</h2></div>
+            <p class="muted small">Questions picked from the weakest topics, at a level that is challenging but doable.</p>
+            <button id="btn-next" class="btn">Suggest 5 questions</button>
+            <ol id="next-list" class="next"></ol>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>Try a question</h2></div>
+            <p class="muted small">See the chance of a correct answer, then tell QuizPulse what really happened.</p>
+            <div class="row wrap">
+              <label class="field">Topic<select id="sel-skill"></select></label>
+              <label class="field">Question<select id="sel-question"></select></label>
+              <button id="btn-predict" class="btn primary">Predict</button>
+            </div>
+            <div id="predict-result" class="result hidden">
+              <div class="gauge"><div id="gauge-fill"></div></div>
+              <p id="predict-text"></p>
+              <div class="row">
+                <span class="muted small">What did the student answer?</span>
+                <button class="btn ok" data-correct="1">Correct</button>
+                <button class="btn bad" data-correct="0">Wrong</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PIPELINE CONSOLE ================= -->
+    <section id="console" class="panel">
+      <div class="grid kpis">
+        <div class="card kpi"><small>Model in use</small><b id="k-version">-</b><span id="k-kind" class="muted small"></span></div>
+        <div class="card kpi"><small>Live AUC (last <span id="k-window">1500</span>)</small><b id="k-auc">-</b><span id="k-auc-sub" class="muted small"></span></div>
+        <div class="card kpi"><small>Drift status</small><b id="k-drift">-</b><span id="k-drift-sub" class="muted small"></span></div>
+        <div class="card kpi"><small>Predictions / labels</small><b id="k-counts">-</b><span id="k-counts-sub" class="muted small"></span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Operator actions</h2><span id="live" class="pill live">live</span></div>
+        <div class="row wrap">
+          <button id="act-drift" class="btn">Run drift check</button>
+          <button id="act-retrain" class="btn primary">Retrain now</button>
+          <button id="act-reload" class="btn">Reload production model</button>
+          <a id="lnk-report" class="btn link" target="_blank" rel="noopener">Drift report</a>
+          <a id="lnk-mlflow" class="btn link" target="_blank" rel="noopener">MLflow</a>
+          <a id="lnk-grafana" class="btn link" target="_blank" rel="noopener">Grafana</a>
+          <a id="lnk-prom" class="btn link" target="_blank" rel="noopener">Prometheus</a>
+        </div>
+        <p id="act-msg" class="muted small"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Pipeline at a glance</h2></div>
+        <div id="flow" class="flow"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Batch pipeline speed</h2></div>
+        <div id="throughput" class="row wrap muted small">no pipeline report found yet</div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <div class="card-head"><h2>Model versions (registry)</h2></div>
+          <div class="scroll"><table id="tbl-models"><thead><tr><th>Ver</th><th>Alias</th><th>Source</th><th>Type</th><th>Valid AUC</th><th>Commit</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Runs by outcome</h2></div>
+          <div class="scroll"><table id="tbl-status"><thead><tr><th>Stage</th><th>Success</th><th>Failed</th><th>Skipped</th><th>Avg time</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Recent pipeline runs</h2>
+          <select id="run-filter"><option value="">all stages</option><option>ingest</option><option>drift</option><option>retrain</option><option>promotion</option></select></div>
+        <div class="scroll"><table id="tbl-runs"><thead><tr><th>#</th><th>When</th><th>Stage</th><th>Status</th><th>Time</th><th>Rows</th><th>Details</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ================= HELP ================= -->
+    <section id="help" class="panel">
+      <div class="card prose">
+        <h1>User manual</h1>
+        <h2>For students and teachers</h2>
+        <ol>
+          <li>Open <b>My learning</b>, type a student ID (suggestions appear) and press <b>Show my topics</b>.</li>
+          <li>Each bar is the estimated chance that the student answers a question in that topic correctly. Red bars (below 50%) are <b>weak topics</b>.</li>
+          <li>Press <b>Suggest 5 questions</b> to get practice questions from the weakest topics.</li>
+          <li>Under <b>Try a question</b>, choose a topic and question, press <b>Predict</b>, then press <b>Correct</b> or <b>Wrong</b> to teach QuizPulse the real result.</li>
+        </ol>
+        <h2>For operators</h2>
+        <ol>
+          <li><b>Pipeline &amp; models</b> shows the model in use, its live accuracy (AUC), and whether the incoming data has changed (drift).</li>
+          <li><b>Run drift check</b> compares recent data with the training data. <b>Retrain now</b> trains a new model and only switches to it if it is better.</li>
+          <li>The green dot top right means the API is reachable. Red means start the backend (<code>docker compose up</code>).</li>
+        </ol>
+        <p class="muted">Full manual: <code>docs/USER_MANUAL.md</code>.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

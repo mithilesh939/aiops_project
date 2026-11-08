@@ -1,0 +1,4 @@
+# Static UI served by nginx.  Talks to the backend only through the REST URL in config.js
+FROM nginx:1.27-alpine
+COPY frontend/ /usr/share/nginx/html/
+EXPOSE 80

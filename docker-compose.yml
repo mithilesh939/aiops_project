@@ -1,0 +1,136 @@
+# QuizPulse - full stack.   `docker compose up --build`
+#   frontend  http://localhost:8080      (UI, separate container, REST only)
+#   api       http://localhost:8000/docs (FastAPI, Swagger UI)
+#   mlflow    http://localhost:5000      (tracking + model registry)
+#   grafana   http://localhost:3000      (dashboard, anonymous admin for the demo)
+#   prometheus http://localhost:9090
+#   monitor   http://localhost:8100      (drift + performance exporter, retrain trigger)
+
+x-backend: &backend
+  image: quizpulse-backend:latest
+  build: { context: ., dockerfile: docker/Dockerfile.backend }
+  environment: &backend-env
+    DATABASE_URL: postgresql+psycopg2://quizpulse:quizpulse@postgres:5432/quizpulse
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    MONITOR_URL: http://monitor:8100
+    REPORTS_DIR: /app/reports
+    LOG_LEVEL: INFO
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: quizpulse
+      POSTGRES_PASSWORD: quizpulse
+      POSTGRES_DB: quizpulse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quizpulse -d quizpulse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mlflow:
+    <<: *backend
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql+psycopg2://quizpulse:quizpulse@postgres:5432/mlflow
+      --artifacts-destination /mlartifacts --serve-artifacts
+      --allowed-hosts "*" --cors-allowed-origins "*"
+    environment:
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    ports: ["5000:5000"]
+    volumes: [mlartifacts:/mlartifacts]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  bootstrap:                    # train + register the first model, seed history (runs once, then exits)
+    <<: *backend
+    command: python scripts/bootstrap.py
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    depends_on:
+      postgres: { condition: service_healthy }
+      mlflow: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    <<: *backend
+    ports: ["8000:8000"]
+    environment:
+      <<: *backend-env
+      MODEL_POLL_SECONDS: "5"
+    volumes:
+      - ./reports:/app/reports
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  monitor:
+    <<: *backend
+    command: uvicorn src.monitoring.monitor_app:app --host 0.0.0.0 --port 8100
+    ports: ["8100:8100"]
+    environment:
+      <<: *backend-env
+      MONITOR_INTERVAL: "10"
+      AUTO_RETRAIN: "1"          # set to 0 to demo the retrain button manually
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  frontend:
+    build: { context: ., dockerfile: docker/Dockerfile.frontend }
+    image: quizpulse-frontend:latest
+    ports: ["8080:80"]
+    depends_on: [api]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    ports: ["9090:9090"]
+    depends_on: [api, monitor]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/quizpulse.json
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  mlflow-serve:                 # optional: the registered model exposed by MLflow's own REST server
+    <<: *backend
+    profiles: ["mlserve"]
+    command: >
+      mlflow models serve -m "models:/quizpulse-kt@production" -p 5001 -h 0.0.0.0 --env-manager local
+    ports: ["5001:5001"]
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:
+  mlartifacts:

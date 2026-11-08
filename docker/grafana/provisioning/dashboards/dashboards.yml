@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: quizpulse
+    folder: QuizPulse
+    type: file
+    options: { path: /var/lib/grafana/dashboards }

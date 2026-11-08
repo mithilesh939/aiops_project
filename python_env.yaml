@@ -1,0 +1,6 @@
+python: "3.12"
+build_dependencies:
+  - pip
+  - setuptools
+dependencies:
+  - -r requirements.txt

@@ -1,0 +1,64 @@
+# QuizPulse pipeline parameters (read by every DVC stage).
+# Change a value and run `dvc repro`: DVC re-runs only the stages that depend on it.
+
+data:
+  source: synthetic            # synthetic | assistments
+  assistments_path: data/external/skill_builder_data.csv
+  seed: 42
+
+generator:                      # Sanrathi-style synthetic data (used when source=synthetic)
+  n_students: 600
+  n_skills: 12
+  questions_per_skill: 25
+  n_weeks: 7                    # week 1..7
+  attempts_per_week: 12         # attempts per student per week
+  drift_week: 7                 # this week gets injected drift (set 0 to disable)
+  drift_new_skills: 3           # new syllabus topics appear in the drift week
+  drift_new_skill_share: 0.5    # share of drift-week attempts on new topics
+  drift_difficulty_shift: 1.0   # every question gets harder by this many logits
+
+batches:
+  train_weeks: 3                # batch_0 = weeks 1..3 (initial training)
+  n_live_batches: 4             # batch_1..batch_4 = "new weeks" replayed to the API
+  assistments_train_fraction: 0.5
+
+features:
+  engine: ray                   # ray | pandas   (pandas is used in CI / tests)
+  recent_window: 5
+  difficulty_prior_weight: 10   # smoothing strength for the question correct-rate
+  time_cap_hours: 720
+
+train:
+  valid_fraction: 0.2           # last 20% (by time) of batch_0 = validation
+  seed: 42
+  logreg:
+    C: 1.0
+    max_iter: 500
+  lightgbm:
+    n_estimators: 300
+    learning_rate: 0.03
+    num_leaves: 7
+    min_child_samples: 100
+    subsample_freq: 1
+    subsample: 0.8
+    colsample_bytree: 0.9
+
+registry:
+  model_name: quizpulse-kt
+  experiment: quizpulse-training
+  promotion_min_auc_delta: 0.002 # candidate must beat production AUC by at least this
+
+drift:
+  window: 1500                  # most recent live predictions compared to training data
+  psi_threshold: 0.2            # PSI above this = a drifted feature
+  drift_share_threshold: 0.3    # >= this share of drifted features = dataset drift
+  prediction_psi_threshold: 0.2
+  auc_drop_threshold: 0.04
+  min_labeled_rows: 300
+
+retrain:
+  experiment: quizpulse-retrain
+  min_new_rows: 500
+  cooldown_minutes: 5
+  recent_rows: 6000             # most recent labelled rows = the "current regime"
+  holdout_fraction: 0.4         # last 40% of that window = hold-out for the fair comparison

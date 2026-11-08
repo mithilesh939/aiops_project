@@ -1,0 +1,74 @@
+# DVC pipeline = the CI "DAG" of the project (see `dvc dag`).  Run everything with `dvc repro`.
+stages:
+  generate:
+    cmd: python -m src.data.synthetic_generator
+    deps:
+      - src/data/synthetic_generator.py
+    params:
+      - data.seed
+      - generator
+    outs:
+      - data/raw/synthetic_attempts.parquet
+
+  ingest:
+    cmd: python -m src.data.ingest
+    deps:
+      - src/data/ingest.py
+      - data/raw/synthetic_attempts.parquet
+    params:
+      - data.source
+      - data.assistments_path
+    outs:
+      - data/processed/attempts.parquet
+    metrics:
+      - reports/data_quality.json:
+          cache: false
+
+  batches:
+    cmd: python -m src.data.make_batches
+    deps:
+      - src/data/make_batches.py
+      - data/processed/attempts.parquet
+    params:
+      - batches
+    outs:
+      - data/batches
+    plots:
+      - reports/batches.json:
+          cache: false
+
+  features:
+    cmd: python -m src.features.build_features
+    deps:
+      - src/features/build_features.py
+      - data/batches
+    params:
+      - features
+    outs:
+      - data/processed/features.parquet
+    metrics:
+      - reports/feature_stats.json:
+          cache: false
+
+  train:
+    cmd: python -m src.models.train
+    deps:
+      - src/models
+      - data/processed/features.parquet
+    params:
+      - train
+      - registry.experiment
+    outs:
+      - data/processed/reference_features.parquet
+    metrics:
+      - reports/train_metrics.json:
+          cache: false
+
+  test:
+    cmd: python -m pytest -q --junitxml=reports/test_report.xml
+    deps:
+      - src
+      - tests
+    outs:
+      - reports/test_report.xml:
+          cache: false
