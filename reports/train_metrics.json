@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "valid_auc": 0.526,
+    "valid_logloss": 0.6894,
+    "valid_accuracy": 0.5493,
+    "test_auc": 0.5232
+  },
+  "logreg": {
+    "valid_auc": 0.7575,
+    "valid_logloss": 0.5875,
+    "valid_accuracy": 0.6887,
+    "test_auc": 0.7619
+  },
+  "lightgbm": {
+    "valid_auc": 0.7598,
+    "valid_logloss": 0.5828,
+    "valid_accuracy": 0.692,
+    "test_auc": 0.7676
+  }
+}

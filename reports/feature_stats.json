@@ -1,0 +1,22 @@
+{
+  "engine": "ray",
+  "rows": 50454,
+  "seconds": 37.386,
+  "throughput_rows_per_s": 1350,
+  "feature_means": {
+    "overall_acc": 0.5242,
+    "skill_acc": 0.5139,
+    "skill_attempts": 4.8007,
+    "recent_acc5": 0.5204,
+    "hours_since_last": 22.2103,
+    "question_difficulty": 0.5121
+  },
+  "null_counts": {
+    "overall_acc": 0,
+    "skill_acc": 0,
+    "skill_attempts": 0,
+    "recent_acc5": 0,
+    "hours_since_last": 0,
+    "question_difficulty": 0
+  }
+}

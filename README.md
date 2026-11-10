@@ -58,3 +58,12 @@ Tests: `pytest` (32 tests) - lint: `ruff check src tests scripts`.
 
 
 
+
+## Rollback
+
+If a promoted model misbehaves, move the `production` alias back and reload the API:
+
+    python scripts/rollback.py          # previous version
+    python scripts/rollback.py --to 1   # a specific version
+
+The alias move is the rollback; the API picks it up through `/admin/reload`.

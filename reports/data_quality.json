@@ -1,0 +1,26 @@
+{
+  "rows": 50454,
+  "checks": {
+    "schema_ok": true,
+    "no_nulls": true,
+    "target_binary": true,
+    "timestamps_sorted": true,
+    "min_rows_ok": true
+  },
+  "students": 600,
+  "skills": 15,
+  "questions": 375,
+  "positive_rate": 0.5147,
+  "rows_per_week": {
+    "1": 7272,
+    "2": 7162,
+    "3": 7120,
+    "4": 7253,
+    "5": 7302,
+    "6": 7126,
+    "7": 7219
+  },
+  "passed": true,
+  "seconds": 0.358,
+  "throughput_rows_per_s": 140933
+}

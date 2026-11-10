@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def build_features(df: pd.DataFrame, engine: str = "pandas", params: dict | None
         import ray
         if not ray.is_initialized():
             ray.init(ignore_reinit_error=True, include_dashboard=False, logging_level="ERROR",
-                     num_cpus=None)
+                     num_cpus=int(os.environ.get('RAY_NUM_CPUS', '0')) or None)
         ds = ray.data.from_pandas(df)
         ds = ds.groupby("user_id").map_groups(
             lambda g: user_features(g, window, cap), batch_format="pandas")

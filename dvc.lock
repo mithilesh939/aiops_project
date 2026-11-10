@@ -1,0 +1,162 @@
+schema: '2.0'
+stages:
+  generate:
+    cmd: python -m src.data.synthetic_generator
+    deps:
+    - path: src/data/synthetic_generator.py
+      hash: md5
+      md5: 80fd33f906e95acee77706371ee9522c
+      size: 4134
+    params:
+      params.yaml:
+        data.seed: 42
+        generator:
+          n_students: 600
+          n_skills: 12
+          questions_per_skill: 25
+          n_weeks: 7
+          attempts_per_week: 12
+          drift_week: 7
+          drift_new_skills: 3
+          drift_new_skill_share: 0.5
+          drift_difficulty_shift: 1.0
+    outs:
+    - path: data/raw/synthetic_attempts.parquet
+      hash: md5
+      md5: b895ebbecb8aea6f68d6566066d571ec
+      size: 916233
+  ingest:
+    cmd: python -m src.data.ingest
+    deps:
+    - path: data/raw/synthetic_attempts.parquet
+      hash: md5
+      md5: b895ebbecb8aea6f68d6566066d571ec
+      size: 916233
+    - path: src/data/ingest.py
+      hash: md5
+      md5: fc2ad25f29e9f4c0161b94c83f6f018a
+      size: 4371
+    params:
+      params.yaml:
+        data.assistments_path: data/external/skill_builder_data.csv
+        data.source: synthetic
+    outs:
+    - path: data/processed/attempts.parquet
+      hash: md5
+      md5: b895ebbecb8aea6f68d6566066d571ec
+      size: 916233
+    - path: reports/data_quality.json
+      hash: md5
+      md5: 587a12a1912a662efc68bb1dc17c2ddc
+      size: 450
+  batches:
+    cmd: python -m src.data.make_batches
+    deps:
+    - path: data/processed/attempts.parquet
+      hash: md5
+      md5: b895ebbecb8aea6f68d6566066d571ec
+      size: 916233
+    - path: src/data/make_batches.py
+      hash: md5
+      md5: c4919316303800da286be086ea6ca4f0
+      size: 2373
+    params:
+      params.yaml:
+        batches:
+          train_weeks: 3
+          n_live_batches: 4
+          assistments_train_fraction: 0.5
+    outs:
+    - path: data/batches
+      hash: md5
+      md5: 3430db6e5aea27bb8d191899911793e0.dir
+      size: 929563
+      nfiles: 5
+    - path: reports/batches.json
+      hash: md5
+      md5: 53eed7ecd3622a4df7d3d264954a4184
+      size: 724
+  features:
+    cmd: python -m src.features.build_features
+    deps:
+    - path: data/batches
+      hash: md5
+      md5: 3430db6e5aea27bb8d191899911793e0.dir
+      size: 929563
+      nfiles: 5
+    - path: src/features/build_features.py
+      hash: md5
+      md5: 179a0ada979038e6f190468851954032
+      size: 6749
+    params:
+      params.yaml:
+        features:
+          engine: ray
+          recent_window: 5
+          difficulty_prior_weight: 10
+          time_cap_hours: 720
+    outs:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: 6ccb5813a84d584b8f65fff30eeebcfb
+      size: 1741757
+    - path: reports/feature_stats.json
+      hash: md5
+      md5: 359d2cbc6e836d711372f059491f4ec4
+      size: 463
+  train:
+    cmd: python -m src.models.train
+    deps:
+    - path: data/processed/features.parquet
+      hash: md5
+      md5: 6ccb5813a84d584b8f65fff30eeebcfb
+      size: 1741757
+    - path: src/models
+      hash: md5
+      md5: 1c8906f36509eb2e8e48464a4b8a88f2.dir
+      size: 14545
+      nfiles: 5
+    params:
+      params.yaml:
+        registry.experiment: quizpulse-training
+        train:
+          valid_fraction: 0.2
+          seed: 42
+          logreg:
+            C: 1.0
+            max_iter: 500
+          lightgbm:
+            n_estimators: 300
+            learning_rate: 0.03
+            num_leaves: 7
+            min_child_samples: 100
+            subsample_freq: 1
+            subsample: 0.8
+            colsample_bytree: 0.9
+    outs:
+    - path: data/processed/reference_features.parquet
+      hash: md5
+      md5: 0f8f49ffc3e3964ba7ab8e123cb7a1e7
+      size: 88382
+    - path: reports/train_metrics.json
+      hash: md5
+      md5: c71af53f0c6cd9f97ca42a63a7094e49
+      size: 382
+  test:
+    cmd: python -m pytest -q --junitxml=reports/test_report.xml
+    deps:
+    - path: src
+      hash: md5
+      md5: 55a7885ab58f6404494e4cf184fbb56f.dir
+      size: 87157
+      nfiles: 27
+    - path: tests
+      hash: md5
+      md5: 81611a7be575653a1e8a0e4e83d17d86.dir
+      size: 13766
+      nfiles: 5
+    outs:
+    - path: reports/test_report.xml
+      hash: md5
+      md5: e4535420365146a47d019228fb5f63ae
+      size: 3469
