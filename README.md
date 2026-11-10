@@ -57,3 +57,4 @@ Tests: `pytest` (32 tests) - lint: `ruff check src tests scripts`.
 `docs/STEP_BY_STEP_GUIDE.md` (start here) | `docs/HLD.md` | `docs/LLD.md` | `docs/TEST_PLAN.md` | `docs/TEST_REPORT.md` | `docs/USER_MANUAL.md` | `docs/VIVA_PREP.md` | `report/REPORT.md` | `AI_DISCLOSURE.md`
 
 
+
